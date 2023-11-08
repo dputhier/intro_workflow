@@ -1,0 +1,226 @@
+---
+title: "An introduction to workflows (code)"
+author: "Denis Puthier"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    fig_caption: yes
+    highlight: zenburn
+    theme: cerulean
+    toc: no
+    toc_depth: 3
+  pdf_document:
+    fig_caption: yes
+    highlight: zenburn
+    toc: no
+    toc_depth: 3
+  word_document: default
+---
+
+
+<script type="">
+    $(function() {
+        $(".hideshow").click(function() {
+                $(this).parent().find(".exo").toggle();
+        });
+            
+    })
+</script>
+
+<style>
+.exo {
+  display:none;
+}
+
+pre:not(.sourceCode) > code {
+  background-color: white !important;
+  color: grey !important;
+} 
+
+hr {
+  color: grey !important;
+}
+</style>
+
+## Les variables
+
+- On peut créer ses propres variables
+- Il faudra préfixer les variables avec le caractère ‘$’ pour y faire référence
+
+
+```{bash, eval=FALSE}
+PROJECT=project_dputhier # Attention, pas d’espace autour de l’opérateur "="
+echo ${PROJECT} # ou echo $PROJECT 
+echo /shared/projects/${PROJECT}
+WORKDIR=/shared/projects/${PROJECT}
+echo ${WORKDIR}
+```
+
+## Préparation de l’environnement de travail
+
+```{bash, eval=FALSE}
+mkdir -p ${WORKDIR}/tp_workflow/
+cd ${WORKDIR}/tp_workflow/
+mkdir data
+cd data
+wget https://zenodo.org/records/10081865/files/FILE1.fastq.gz
+wget https://zenodo.org/records/10081865/files/FILE2.fastq.gz
+wget https://zenodo.org/records/10081865/files/FILE3.fastq.gz
+cd .. 
+touch script_01.sh 
+```
+
+## script_01.sh
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+fastqc --outdir fastqc data/FILE1.fastq.gz
+fastqc --outdir fastqc data/FILE2.fastq.gz
+fastqc --outdir fastqc data/FILE3.fastq.gz
+```
+
+
+## script_02.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+SAMPLE=FILE1
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+
+SAMPLE=FILE2
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+
+SAMPLE=FILE3
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+```
+
+## script_03.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+SAMPLE=FILE1
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz 2> fastqc/${SAMPLE}.log
+
+SAMPLE=FILE2
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz 2> fastqc/${SAMPLE}.log
+
+SAMPLE=FILE3
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz 2> fastqc/${SAMPLE}.log
+```
+
+## script_04.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+for SAMPLE in FILE1 FILE2 FILE3
+do
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz &> fastqc/${SAMPLE}.log
+done
+```
+
+## script_05.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+
+mkdir -p fastqc
+
+module load fastqc/0.11.9
+
+for SAMPLE in $(ls --color=none data/ | sed 's/.fastq.gz//')
+do
+echo ">>> Processing $SAMPLE"
+fastqc --outdir fastqc data/${SAMPLE}.fastq.gz &> fastqc/${SAMPLE}.log
+done
+```
+
+## script_06.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+
+#SBATCH --partition=fast
+#SBATCH --job-name=my_fastqc
+#SBATCH --account=2325_ebaii # Modifier en fonction du projet
+#SBATCH --cpus-per-task=1 # Modifier en fonction des besoins
+#SBATCH --mem=4GB         # Idem
+  
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+for SAMPLE in $(ls --color=none data/ | sed 's/.fastq.gz//')
+do
+echo ">>> Processing $SAMPLE"
+srun --job-name $SAMPLE fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+done
+```
+
+## script_07.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --partition=fast
+#SBATCH --job-name=my_fastqc
+#SBATCH --account=2325_ebaii # Modifier en fonction du projet
+#SBATCH --cpus-per-task=1 # Modifier en fonction des besoins
+#SBATCH --mem=4GB         # Idem
+#SBATCH --array=1-3 # Modifier en fonction du nb de tâches à lancer en parallèle
+
+mkdir -p fastqc
+module load fastqc/0.11.9
+
+# le Nième fichier de ma liste
+SAMPLE=$(ls --color=none data/ | sed 's/.fastq.gz//' | \
+head -n ${SLURM_ARRAY_TASK_ID} | tail -n 1)
+
+srun --job-name $SAMPLE fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+```
+
+## script_08.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --partition=fast
+#SBATCH --job-name=my_fastqc
+#SBATCH --account=2325_ebaii # Modifier en fonction du projet
+#SBATCH --cpus-per-task=1 # Modifier en fonction des besoins
+#SBATCH --mem=4GB         # Idem
+#SBATCH --array=1-3 # Modifier en fonction du nb de tâches à lancer en parallèle
+
+mkdir -p fastqc
+module load fastqc/0.11.9
+mkdir -p trimmomatic
+module load trimmomatic/0.39
+
+# le Nième fichier de ma liste
+SAMPLE=$(ls --color=none data/ | sed 's/.fastq.gz//' | \
+head -n ${SLURM_ARRAY_TASK_ID} | tail -n 1)
+
+srun --job-name FASTQC-$SAMPLE fastqc --outdir fastqc data/${SAMPLE}.fastq.gz
+srun --job-name TRIM-$SAMPLE trimmomatic SE -threads 4 -phred33 \
+                            data/${SAMPLE}.fastq.gz  trimmomatic/${SAMPLE}.fastq.gz \
+                            SLIDINGWINDOW:4:20 MINLEN:20
+```
