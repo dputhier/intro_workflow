@@ -1,5 +1,5 @@
 ---
-title: "An introduction to workflows (code)"
+title: "Une introduction aux workflows (code)"
 author: "Denis Puthier"
 date: '`r Sys.Date()`'
 output:
@@ -7,7 +7,8 @@ output:
     fig_caption: yes
     highlight: zenburn
     theme: cerulean
-    toc: no
+    toc: yes
+    toc_float: true
     toc_depth: 3
   pdf_document:
     fig_caption: yes
